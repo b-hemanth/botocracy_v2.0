@@ -13,34 +13,36 @@
 
 -   `/data/` contains the raw data files and sampling code
 -   `/shiny/` contains the Shiny app that can be run locally with included installs and the setup of a Python Conda environment via a R `reticulate` environment
--   `/paper/` contains the Rmd with the model evaluation that yields the final PDF as well as \LaTeX style files
+-   `/paper/` contains the Rmd with the model evaluation that yields the final PDF as well as \\LaTeX style files
 -   `/demo/` contains demos of the Shiny app recorded
 
-## Demo (screenshot explanation)
+## Demo
 
 The Shiny App takes a Twitter username and a number of Tweets to check and returns:
 
 1.  An overall prediction if the user is a bot and the mean bot score they attained from the tuned Random Forest model run on the important principal components of BERT word embeddings of user tweets combined with their metadata such as followers count, friends count, favorites count, number of days the account has existed, whether they have the 8-digit serial number that Twitter auto-generates for non-custom usernames, and so on.
 2.  The set of requested `n` tweets from the user and the bot prediction (1 or 0) for each Tweet (based along with the relevant metadata of each tweet)
 
-### Example 1: @HemanthBharatha
+### Screen Recording
 
-![User: HemanthBharatha](demo/screenshots/hemanthbharatha_demo_1.png){width="557"}
+### Example 1: \@HemanthBharatha
 
-![User: HemanthBharatha (contd.)](demo/screenshots/hemanthbharatha_demo_2.png){width="557"}
+![User: HemanthBharatha](demo/screenshots/hemanthbharatha_demo_1.png)
 
-### Example 2: @narendramodi
+![User: HemanthBharatha (contd.)](demo/screenshots/hemanthbharatha_demo_2.png)
 
-![User: \@narendramodi](demo/screenshots/narendramodi_demo.png){width="557"}
+### Example 2: \@narendramodi
+
+![User: \@narendramodi](demo/screenshots/narendramodi_demo.png)
 
 ### Example 3: a BJP fan
 
-![User account screnshot](demo/screenshots/bjp_fan_account.png){width="557"}
+![User account screnshot](demo/screenshots/bjp_fan_account.png)
 
-![User timeline sample](demo/screenshots/bjp_fan_tweets_example.png){width="557"}
+![User timeline sample](demo/screenshots/bjp_fan_tweets_example.png)
 
-![BJP fan account: results](demo/screenshots/bjp_fan_demo.png){width="557"}
+![BJP fan account: results](demo/screenshots/bjp_fan_demo.png)
 
 ### Example loading screen
 
-![Loading screen demo](demo/screenshots/loading_screen_demo.png){width="518"}
+![Loading screen demo](demo/screenshots/loading_screen_demo.png)
