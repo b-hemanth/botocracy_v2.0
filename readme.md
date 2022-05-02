@@ -1,5 +1,5 @@
 # Botocracy
-
+## A BERT-powered text model for authoritarian Twitter platform manipulation in India
 ***By: Hemanth Bharatha Chakravarthy & Em McGlone***
 
 *2 May, 2022. All errors are our own.*
