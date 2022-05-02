@@ -25,6 +25,9 @@ The Shiny App takes a Twitter username and a number of Tweets to check and retur
 
 ### Screen Recording
 
+https://user-images.githubusercontent.com/43194858/166337515-cfc46112-b7b8-4abd-883d-44a433e01670.mp4
+
+
 ### Example 1: \@HemanthBharatha
 
 ![User: HemanthBharatha](demo/screenshots/hemanthbharatha_demo_1.png)
