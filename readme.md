@@ -1,12 +1,12 @@
 # Botocracy
 ## A BERT-powered Tweet text & metadata model for authoritarian platform manipulation detection in India
-***By: ![Hemanth Bharatha Chakravarthy](mailto:hbharathachakravarthy@gmail.com) & ![Em McGlone](mailto:mdmcglone@college.harvard.edu)***
+***By: [Hemanth Bharatha Chakravarthy](mailto:hbharathachakravarthy@gmail.com) & [Em McGlone](mailto:mdmcglone@college.harvard.edu)***
 
 *2 May, 2022. All errors are our own.*
 
 ## Deliverables
 
--   ![`botocracy.PDF`](https://github.com/b-hemanth/botocracy_v2.0/blob/main/Botocracy.pdf) is the final paper deliverable. It is a self-standing document that outlines the data, wrangling, feature engineering, models tried, model evaluation, and model choice and discussion of the same. **It is our primary output.**
+-   [`botocracy.PDF`](https://github.com/b-hemanth/botocracy_v2.0/blob/main/Botocracy.pdf) is the final paper deliverable. It is a self-standing document that outlines the data, wrangling, feature engineering, models tried, model evaluation, and model choice and discussion of the same. **It is our primary output.**
 -   `/shiny/` is the final deliverable Shiny app. As we use a unique Python-R hybrid back-end, Shiny's default domain API does not have capacity to run this app. Hence, the app is run locally and screen recordings are submitted in `/demo/`.
 -   Demo screen recording video and screeenshots are embedded below.
 
