@@ -1,6 +1,6 @@
 # Botocracy
-## A BERT-powered text model for authoritarian Twitter platform manipulation in India
-***By: Hemanth Bharatha Chakravarthy & Em McGlone***
+## A BERT-powered Tweet text & metadata model for authoritarian platform manipulation detection in India
+***By: ![Hemanth Bharatha Chakravarthy](mailto:hbharathachakravarthy@gmail.com) & ![Em McGlone](mailto:mdmcglone@college.harvard.edu)***
 
 *2 May, 2022. All errors are our own.*
 
