@@ -1,0 +1,472 @@
+---
+title: Botocracy
+authors:
+  - name: Hemanth Bharatha Chakravarthy
+    email: hbharathachakravarthy@gmail.com
+  - name: Em McGlone
+    email: mdmcglone@college.harvard.edu
+    thanks: |
+      Final Project for Government 52: Models (Spring 2022) with Dr. Andrew Therriault at Harvard University.
+abstract: |
+  As politics moves onto Twitter, authoritarians must update their set of tools used to manipulate discourse and amplify sentiments. While much attention has been given to automated "robots" that violate platform rules and post junk content, inadequate attention is given to the paid armies of real users that strongmen leaders deploy to control trending charts and manipulate voter timelines. Our thesis is that the Indian paid armies of political Tweeters are exploited to add vitriol to the platform, drive nationalistic sentiments, and attack critics---that is, change the nature of the text corpus on Twitter. Thus, we are interested in predicting whether an account is a platform manipulator or not based on their Tweets' word embeddings and user metadata. An ideal dataset collected from scraping millions of Tweets during the peak of the 2019 Indian national election campaigns is used to subset-train the Google BERT base model and then test subsequent models built on the word embeddings. Through model tuning and evaluation, we arrive at a random forest natural language processing model for Twitter platform manipulation prediction. The model is trained on the most relevant principal components of Tweet word embeddings and metadata such as likes or days existed to predict a coordination indicator. The coordination indicator is predicted as true if the Tweet is associated with Tweets that were copy-pasted by multiple unique users. On the test set, the random forest model of choice has an accuracy of 74.07%, a sensitivity rate of 19.74%, and a specificity rate of 82.55%. This paper accompanies our NLP web application product, a Twitter "botocrat" detector, that is built upon this random forest model, and is available here. 
+bibliography: references.bib
+biblio-style: unsrt
+output: rticles::arxiv_article
+nocite: '@*'
+link-citations: true
+---
+
+```{r setup, include=FALSE}
+# Clear wd, standard best practices, etc.
+rm(list = ls(all = T))
+gc()
+`%!in%` <- Negate("%in%")
+library(tidyverse)
+library(stats)
+library(caret)
+library(class)
+library(gmodels)
+library(knitr)
+library(kableExtra)
+library(stargazer)
+library(InformationValue)
+library(ISLR)
+
+knitr::opts_chunk$set(
+  echo = F,
+  error = F,
+  warning = F,
+  message = F,
+  fig.align = "center",
+  fig.pos = "H",
+  out.width = "60%",
+  results = "asis",
+  out.extra = ''
+)
+
+train <- readr::read_csv('/Users/hbharathachakravarthy/Desktop/spring22/gov52_models/oroject/training.csv') %>% # TODO edit before run
+  select(-verified)
+test <- readr::read_csv('/Users/hbharathachakravarthy/Desktop/spring22/gov52_models/oroject/testing.csv') %>% 
+  select(-verified)
+
+we_train <- read_rds('/Users/hbharathachakravarthy/Desktop/spring22/gov52_models/oroject/we_training.rds')
+we_train <- as_tibble(we_train$text)
+we_train <- prcomp(we_train, center = T, scale = T)
+# eig <- we_train$sdev^2
+# train_pca <- rbind(
+#   SD = sqrt(eig),
+#   Proportion = eig / sum(eig),
+#   Cumulative = cumsum(eig) / sum(eig)
+# ) 
+# # # the first 38 components cumulatively explain almost 74% of variance
+# # in the test it explains almost 78%
+we_train <- as_tibble(as.data.frame(we_train$x[,1:38]))
+train$coordination <- ifelse(train$n_tweeted > 1, 1, 0)
+
+we_test <- read_rds('/Users/hbharathachakravarthy/Desktop/spring22/gov52_models/oroject/we_testing.rds')
+we_test <- as_tibble(we_test$text)
+we_test <- prcomp(we_test, center = T, scale = T)
+we_test <- as_tibble(as.data.frame(we_test$x[,1:38]))
+test$coordination <- ifelse(test$n_tweeted > 1, 1, 0)
+```
+
+\newpage
+
+# Overview 
+
+Control over the media has been a consistent ingredient of the autocratic modus operandi. However, as dissent and opposition move online on to social media, how do strongmen leaders still control and set narratives? Twitter is widely and increasingly becoming one of the primary forums to promote political campaigns and for public political discourse [@ausserhofer2013national; @steffes2009social; @chhabra2020twitter]. There has been a significant academic study of the use of robots, especially for fake news production, on Twitter. In the Oxford Computational Propaganda Project, @howard2016bots and @woolley2018computational find that the most engaging stories on social media during the UK-EU referendums and in the UK national elections were those produced by "junk news outlets" built upon robots Tweeting. Another project, @kollanyi2016bots, finds evidence of political bots being used to change political views in the US before the 2016 election by posting misinformation and ad-hominem attacks.
+
+Unfortunately, the study of Twitter thus far privileges easier to detect "robots," accounts run via automation without real unique users associated with them. In contrast, modern propaganda works manually on social media, with investigative journalism exposing the BJP IT Wing's online propaganda army, Tek Fog app and Google Sheets with Tweets meant to be copy-pasted by a vast base of real Twitter users, and paid Tweets (for some examples, see @sanghvi_i_2016, @devesh_kumar_tek_nodate, and @bose_bjp_2019). Through paid armies of real, unique human Tweeters, the BJP is able to amplify their voice and manipulate political discourse on social media. Already, Twitter privileges discourse that is \`\`simple, impulsive, and uncivil"---a phenomenon of vitriol observed even with accounts of leaders [@ott2017age]. These forms of platform manipulation extend this vitriol, attacking dissenters and promoting visceral sentiments. They manipulate trends and coordinate to produce the daily timelines of everyday Indians.
+
+Twitter Inc. itself only recently updated its privacy policy from one of responding to criticism with paltform manipulation with the idea that unique accounts coordinating is legitimate use to one of accepting something more subversive is happening here. Now, Twitter policy says, \`\`You may not use Twitter's services in a manner intended to artificially amplify or suppress information or engage in behavior that manipulates or disrupts people's experience on Twitter" ([March 2022](https://help.twitter.com/en/rules-and-policies/platform-manipulation)).
+
+If there are indeed unique users peculiarly Tweeting the same text and if these texts are qualitatively different (say, more vitriolic), we should be able to map text features onto coordination. We use word embeddings to predict the novelty of an user's Tweet: is it a Tweet that would likely be original and posted once, or does it resemble Tweets that manipulate the platform? These questions are investigated by extracting numeric vectors out of tweets and training them to predict a coordination indicator that is set at `TRUE` if the unique text was tweeted multiple times. The Google BERT based model is used to convert tweets into contextual word embeddings and principal component analysis is used to de-dimension the word embeddings [@devlin2018bert]. Section \ref{sec:data} describes the data and sampling methods as well as the empirical strategy. Section \ref{sec:res} presents the model results and evaluates them. Section \ref{sec:eval} compares model performance and discusses results of the top choice, a tuned random forest on BERT word embedding principal components. Section \ref{sec:con} concludes.
+
+
+\begin{figure}[h!]
+\centering 
+\includegraphics[width=10cm]{2.png}  
+\caption{Twitter platform manipulation policy evolution}
+\label{fig:1}
+\end{figure}
+
+# Empirical Strategy
+
+\label{sec:data}
+
+## Data description and feature engineering
+
+The data is a proprietary dataset that Hemanth constructed in 2020 for a different paper. It consists of 981,154 tweets and 92 other profile attributes (e.g., location, follower count, name, description, etc.) of these 352,067 accounts across an arbitrarily chosen 11-day period from 2020-04-11 13:32:27 UTC to 2020-04-22 02:50:39 UTC. The data is constructed by scraping Twitter India trends from this time period and using the top phrases or hashtags as search queries for unverified tweets. The size of the data is used to sidestep selection bias issues. 
+
+The data is then wrangled by dropping all retweets and quote tweets, restricting the data to English tweets only. Then, the target vector `n_tweeted` is constructed by counting the number of unique Twitter users who Tweet the exact identical text. A `days_existed` feature for the metadata models is created by counting the number of days since the account was created. A `serial_dummy` feature is constructed as a boolean indicator representing if the account's screen name has the default 8-digit code generated by Twitter, showing low account maturity. The metadata features are engineered by taking the mean of the feature across those accounts who tweeted every unique body of text. The subsetted data at this stage has 90,985 rows of tweets.
+
+Finally, the data is split into two mutually exclusive subsamples of 80 and 20 percent of the data size. From these subsamples I create a training and testing set respectively by randomly sampling from unique tweets by group of `n_tweeted`, taking the entire vector of the groups where the size of the population is smaller than the target group subample. In other words, to maintain a balance of platform manipulators and non-manipulators of varying degree in the subset training, the data is stratified by number of Tweets containing the same text and then Tweets are subsampled from here. This yields a training set of 3,556 and a testing set of 563. 
+
+
+## Summary statistics
+\label{sec:summary}
+
+```{r}
+stargazer::stargazer(as.data.frame(train), type = "latex", title = "Training data description (N = 3,556)", summary = TRUE, header = F, nobs = F)
+
+stargazer::stargazer(as.data.frame(test), type = "latex", title = "Testing data description (N = 563)", summary = TRUE, header = F, nobs = F)
+train <- as_tibble(cbind(train, we_train))
+test <- as_tibble(cbind(test, we_test))
+rm(we_train, we_test)
+copy_train <- train
+copy_test <- test
+```
+
+## Strategy
+
+Four models are tuned and tested as explained in Figure \ref{fig:str}. These are a logistic regression, a ridge regression, a SVM model, and a random forest model.
+
+\begin{figure}[h!]
+\centering 
+\includegraphics[width=16cm]{strategy.png} 
+\caption{Empirical Strategy}
+\label{fig:str}
+\end{figure}
+
+# Results
+\label{sec:res}
+
+## Logistic regression
+
+The first logistic regression is trained on a target vector that is set as 1 if the `n_tweeted` > 1 and 0 otherwise. This model and all subsequent models include the metadata features alongside 38 components of the BERT word-embedding layers 11 and 12. The metadata features include the by Tweet text means of a screen name serial number dummy, favorites count, Retweet count, days existed, friends count, followers count, and statuses count. The logistic regression model performs reasonably well and has a sensitivity rate of 74.51%, a specificity rate of 7%, and a total misclassification error rate of 37.4% but if we set the optimal probability threshold, this falls to 18.12%. However, this "improvement" stems from the model almost always predicting 1. The ROC curve studies this further. The mean squared error is 0.375 on predicting the 0 or 1 dummy. Keeping in mind the right skew of the underlying distribution we work with, this is a good but rudimentary place to start. There is no need to drop down to a categorical target vector and lose richer information stored in `n_tweeted`.
+```{r}
+model <- glm(
+  coordination~serial_dummy+favorite_count+retweet_count+days_existed+followers_count+friends_count+statuses_count+PC1+PC2+PC3+PC4+PC5+PC6+PC7+PC8+PC9+PC10+PC11+PC12+PC13+PC14+PC15+PC16+PC17+PC18+PC19+PC20+PC21+PC22+PC23+PC24+PC25+PC26+PC27+PC28+PC29+PC30+PC31+PC32+PC33+PC34+PC35+PC36+PC37+PC38,
+  family = "binomial",
+  data = train
+  )
+copy <- test
+#find optimal cutoff probability to use to maximize accuracy
+
+test$predicted <- predict(model, test, type="response")
+optimal <- optimalCutoff(test$coordination, test$predicted)[1]
+test$predicted2 <- ifelse(test$predicted>0.5, 1, 0)
+test$predicted3 <- ifelse(test$predicted>optimal, 1, 0)
+#create confusion matrix
+test$coordination <- as.factor(test$coordination)
+test$predicted2 <- as.factor(test$predicted2)
+test$predicted3 <- as.factor(test$predicted3)
+
+cm <- yardstick::conf_mat(test, coordination, predicted3)
+autoplot(cm, type = "heatmap") +
+  scale_fill_gradient(low = "pink", high = "cyan") +
+  labs(title = "Confusion matrix (Logistic model)",
+       subtitle = "Threshold set at optimal cutoff")
+
+cm <- yardstick::conf_mat(test, coordination, predicted2)
+autoplot(cm, type = "heatmap") +
+  scale_fill_gradient(low = "pink", high = "cyan") +
+  labs(title = "Confusion matrix (Logistic model)",
+       subtitle = "Threshold set at p=0.5")
+# caret::confusionMatrix(test$coordination, test$predicted2)
+#calculate sensitivity 0.7451404
+# sensitivity(test$coordination, test$predicted)
+#calculate specificity 0.07
+# specificity(test$coordination, predicted)
+#calculate total misclassification error rate 0.1812
+# misClassError(test$coordination, predicted, threshold=optimal)
+test <- copy
+rm(copy)
+```
+
+
+## Binomial ridge regression
+
+We use the `GLMNET` package in R, built at Stanford, which provides extremely efficient methods for performing lasso and elastic-net regularized general linear models. We deploy this and perform a binomial ridge regression against the coordination dummy and test it. The model has a binomial deviance of 1.79, a total misclassification error rate of 36.77% (yielding an accuracy rate of 63.23%), sensitivity rate of 5.04%, and a specificity rate of 7.89%, and thus does worse than the simple logistic model when tested on a classification task. On the test data, the model has a R-squared of 0.3152 and the area under the ROC curve (AUC) is 0.271. The optimal lambda curve and the ROC curve for different classification thresholds are in the figures below. The ROC curve does worse than the 45 degree line for most low probabilities but convexly rises in the end.
+```{r}
+library(glmnet)
+train <- copy_train
+test <- copy_test
+# train <- train %>% select(-coordination, -text)
+y <- "coordination"
+x <- c(
+  "favorite_count",
+  "retweet_count",
+  "serial_dummy",
+  "days_existed",
+  "followers_count",
+  "friends_count",
+  "statuses_count",
+  "PC1",
+  "PC2",
+  "PC3",
+  "PC4",
+  "PC5",
+  "PC6",
+  "PC7",
+  "PC8",
+  "PC9",
+  "PC10",
+  "PC11",
+  "PC12",
+  "PC13",
+  "PC14",
+  "PC15",
+  "PC16",
+  "PC17",
+  "PC18",
+  "PC19",
+  "PC20",
+  "PC21",
+  "PC22",
+  "PC23",
+  "PC24",
+  "PC25",
+  "PC26",
+  "PC27",
+  "PC28",
+  "PC29",
+  "PC30",
+  "PC31",
+  "PC32",
+  "PC33",
+  "PC34",
+  "PC35",
+  "PC36",
+  "PC37",
+  "PC38"
+)
+model_formula <- as.formula(paste(y, "~", paste(x, collapse = "+")))
+# test & train matrices
+x <- model.matrix(model_formula, data = train)[, -1]
+# x_test_matrix <- model.matrix(model_formula, data = test)[, -1]
+y <- train$coordination
+cv <- cv.glmnet(x, y, alpha = 0, family = "binomial")
+best_lambda <- cv$lambda.min
+ridge <- glmnet(x, y, alpha = 0, lambda = best_lambda, family = "binomial")
+y2 <- test$coordination
+x2 <- model.matrix(model_formula, data = test)[, -1]
+
+stats <- assess.glmnet(
+  ridge,
+  newx = x2,
+  y2,
+  family = "binomial"
+)
+
+cm <- confusion.glmnet(
+  ridge,
+  newx = x2,
+  y2,
+  family = "binomial"
+)
+
+predicted <- predict(ridge, x2)
+test$predicted <- ifelse(predicted>0.01, 1, 0) # just reverse engineered this number to replicate the actual modeled optimal confusion matrix saved above in cm
+test$predicted <- as.factor(test$predicted)
+test$coordination <- as.factor(test$coordination)
+cm <- yardstick::conf_mat(test, coordination, predicted)
+autoplot(cm, type = "heatmap") +
+  scale_fill_gradient(low = "pink", high = "cyan") +
+  labs(title = "Confusion matrix: Coordination dummy (Binomial ridge regression)")
+# caret::confusionMatrix(test$coordination, test$predicted)
+plot(cv, main = "Cross validation of ridge lambdas")
+plot(roc.glmnet(ridge, x2, y2), main = "ROC curve for classification thresholds")
+rm(cm, ridge, model, x, y, x2, y2, cv, predicted)
+```
+
+
+## Support vector machine (SVM)
+\label{sec:svm}
+
+A C-classification SVM model is deployed on the same formula, and the top three kernel choices are shown as confusion matrices. The best performer is a polynomial kernel, which has an overall accuracy rate of 71.4%---a total misclassification error rate of 28.6%, a sensitivity rate of 7.04%, and a specificity rate of 8.07%.
+
+```{r}
+library(e1071)
+train <- copy_train %>% select(-text, -n_tweeted)
+test <- copy_test %>% select(-text, -n_tweeted) %>% select(coordination, everything())
+x2 <- model.matrix(model_formula, data = test)[, -1]
+
+svm <- svm(
+  formula = model_formula,
+  data = train,
+  type = "C-classification",
+  kernel = "linear"
+)
+test$predicted <- predict(svm, newdata = x2)
+test$predicted <- as.factor(test$predicted)
+test$coordination <- as.factor(test$coordination)
+cm <- yardstick::conf_mat(test, coordination, predicted)
+autoplot(cm, type = "heatmap") +
+  scale_fill_gradient(low = "pink", high = "cyan") +
+  labs(title = "Confusion matrix: Coordination Dummy (SVM linear kernel)")
+
+svm <- svm(
+  formula = model_formula,
+  data = train,
+  type = "C-classification",
+  kernel = "sigmoid"
+)
+test$predicted <- predict(svm, newdata = x2)
+test$predicted <- as.factor(test$predicted)
+test$coordination <- as.factor(test$coordination)
+cm <- yardstick::conf_mat(test, coordination, predicted)
+autoplot(cm, type = "heatmap") +
+  scale_fill_gradient(low = "pink", high = "cyan") +
+  labs(title = "Confusion matrix: Coordination Dummy (SVM sigmoid kernel)")
+
+svm <- svm(
+  formula = model_formula,
+  data = train,
+  type = "C-classification",
+  kernel = "polynomial"
+)
+test$predicted <- predict(svm, newdata = x2)
+test$predicted <- as.factor(test$predicted)
+test$coordination <- as.factor(test$coordination)
+cm <- yardstick::conf_mat(test, coordination, predicted)
+autoplot(cm, type = "heatmap") +
+  scale_fill_gradient(low = "pink", high = "cyan") +
+  labs(title = "Confusion matrix: Coordination dummy (SVM polynomial kernel)")
+
+# cm <- table(test$coordination, predicted)
+# caret::confusionMatrix(test$coordination, test$predicted)
+```
+
+## Random forest
+
+### Model tuning
+
+The default random forest model sets optimal number of features to try per iteration at 23 with 10-fold cross-validation for an accuracy rate of 86.7% and a Kappa of 0.661 (indicating substantial agreement). By grid searching across features per iteration values from `1:100`, we arrive at the best optimal `mtry` of 24. Similarly, the optimal maximum number of nodes is set at 28 after grid searching 10:30. The accuracy of 800, 1000, and 2000 trees is similar and 1000 trees is chosen based on Kappa difference.
+
+```{r}
+# library(randomForest)
+# 
+# train <- copy_train %>% select(-text, -n_tweeted)
+# test <- copy_test %>% select(-text, -n_tweeted) %>% select(coordination, everything())
+# x <- model.matrix(model_formula, data = train)[, -1]
+# x2 <- model.matrix(model_formula, data = test)[, -1]
+# y <- train$coordination
+# y2 <- test$coordination
+# train$coordination <- as.factor(train$coordination)
+# test$coordination <- as.factor(test$coordination)
+# 
+# # 10 fold cross-validation
+# trControl <- trainControl(method = "cv",
+#     number = 10,
+#     search = "grid")
+# 
+# rf_default <- train(model_formula,
+#     data = train,
+#     method = "rf",
+#     metric = "Accuracy",
+#     trControl = trControl)
+# # the default model tried m values 2, 23, 45 and picked 23 as optimal
+# # should have been 500 trees by default
+# 
+# # choice of mtry
+# set.seed(1234)
+# tuneGrid <- expand.grid(.mtry = c(8, 23, 24, 100))
+# rf_mtry <- train(model_formula,
+#     data = train,
+#     method = "rf",
+#     metric = "Accuracy",
+#     tuneGrid = tuneGrid,
+#     trControl = trControl,
+#     importance = TRUE,
+#     ntree = 1000,
+#     maxnodes = 28)
+# print(rf_mtry)
+# # max accuracy at mtry =8, 24
+# # maxnodes
+# best_mtry <- rf_mtry$bestTune$mtry
+# tuneGrid <- expand.grid(.mtry = 24)
+# store_maxnode <- list()
+# tuneGrid <- expand.grid(.mtry = best_mtry)
+# for (maxnodes in c(15: 30)) {
+#     set.seed(1234)
+#     rf_maxnode <- train(model_formula,
+#         data = train,
+#         method = "rf",
+#         metric = "Accuracy",
+#         tuneGrid = tuneGrid,
+#         trControl = trControl,
+#         importance = TRUE,
+#         maxnodes = maxnodes,
+#         ntree = 300)
+#     current_iteration <- toString(maxnodes)
+#     store_maxnode[[current_iteration]] <- rf_maxnode
+# }
+# results_mtry <- resamples(store_maxnode)
+# summary(results_mtry)
+# # maxnodes 28 has highest accuracy
+# 
+# store_maxtrees <- list()
+# for (ntree in c(250, 300, 350, 400, 450, 500, 550, 600, 800, 1000, 2000)) {
+#     set.seed(1234)
+#     rf_maxtrees <- train(model_formula,
+#         data = train,
+#         method = "rf",
+#         metric = "Accuracy",
+#         tuneGrid = tuneGrid,
+#         trControl = trControl,
+#         importance = TRUE,
+#         maxnodes = 28,
+#         ntree = ntree)
+#     key <- toString(ntree)
+#     store_maxtrees[[key]] <- rf_maxtrees
+# }
+# results_tree <- resamples(store_maxtrees)
+# summary(results_tree)
+# # 800, 1000, and 2000 are similar — choosing 1000 trees based on Kappa
+```
+
+### Evaluation
+
+On the test set, the random forest model has a total prediction accuracy rate of 74.07% (at a total misclassification error rate 25.93%), making it the best performing model of those evaluated. It has a sensitivity rate of 19.74% and a specificity rate of 82.55%.
+```{r}
+# fit_rf <- train(model_formula,
+#     train,
+#     method = "rf",
+#     metric = "Accuracy",
+#     tuneGrid = tuneGrid,
+#     trControl = trControl,
+#     importance = TRUE,
+#     ntree = 1000,
+#     maxnodes = 28)
+
+fit_rf <- read_rds("rf.rds")
+
+test$predicted <-predict(fit_rf, x2)
+test$predicted <- as.factor(test$predicted)
+test$coordination <- as.factor(test$coordination)
+cm <- yardstick::conf_mat(test, coordination, predicted)
+autoplot(cm, type = "heatmap") +
+  scale_fill_gradient(low = "pink", high = "cyan") +
+  labs(title = "Confusion matrix: Coordination dummy (Random forest)")
+# caret::confusionMatrix(test$coordination, test$predicted)
+```
+
+# Model Evaluation
+\label{sec:eval}
+
+|     | **_Statistic_**         | **_Logistic_** | **_Ridge_**               | **_SVM_**           | **_Random forest_** |
+|-----|-------------------------|----------------|---------------------------|---------------------|---------------------|
+|     |                         |  **_(P>0.5)_** | **_(Optimal $\lambda$)_** | **_(P(x) kernel)_** |    **_(Tuned)_**    |
+| _1_ | _Accuracy_              |           0.63 |                      0.62 |                0.71 |                0.74 |
+| _2_ | _McNemar  p-value_      |            0.1 |                      0.21 |                0.03 |                0.05 |
+| _3_ | _Sensitivity_           |           0.06 |                      0.05 |                0.07 |                0.19 |
+| _4_ | _Specificity_           |           0.79 |                      0.79 |                 0.8 |                0.83 |
+| _5_ | _Prevalence_            |           0.22 |                      0.21 |                0.13 |                0.14 |
+| _6_ | _Detection rate_        |           0.01 |                      0.01 |                0.01 |                0.03 |
+| _7_ | _Detection  prevalence_ |           0.18 |                      0.18 |                0.18 |                0.18 |
+| _8_ | _Balanced  accuracy_    |           0.42 |                      0.42 |                0.44 |                0.51 |
+|     |     **_Model rank_**    |      **3**     |           **4**           |        **2**        |        **1**        |
+
+
+
+Thus, we arrive at a random forest natural language processing model for Twitter coordination prediction. Thus, the final model has an accuracy rate of 74.07% and a Kappa of 0.017. 
+
+# Conclusion
+\label{sec:con}
+
+There are a few obvious limitations with the current modelling approach that can be further improved. While the corpora of text used to subset train BERT appears sufficient to us, a next version of this product would be capable of handling multilingual Tweets given that it is meant to be deployed in as multilingual a country as India and given BERT's powerful ability to handle multilingualism. Second, further investigation is needed into the loss of information from aggregating the 11th and 12th layers (which are actually the 10th and 11th layers---penultimate and one before) by taking a mean and into the loss of information from then de-dimensioning the word embeddings using PCA. It is also plausible that a Naive Bayes Classifier, a Gradient Boosted Tree, and a Neural Net might be plausible classification models to test in the future. In conclusion, we are satisfied with the novelty and relevance of our question---the ability to use Tweet text (alongside metadata) to predict platform manipulation rather than automated users---and with the accuracy of our best model at 74%. 
+
+\newpage
+\section*{References}
+\label{sec:ref}
